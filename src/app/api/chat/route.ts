@@ -47,6 +47,9 @@ function buildTrack(id: string, name: string, instrument: string, isDrums = fals
     isDrums,
     stringCount: isDrums ? undefined : 6,
     tuning: isDrums ? undefined : [40, 45, 50, 55, 59, 64],
+    capo: 0,
+    volume: 100,
+    pan: 64,
     measures: []
   };
 }
