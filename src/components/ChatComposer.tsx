@@ -34,7 +34,7 @@ export default function ChatComposer() {
     setError(null);
     setIsSubmitting(true);
 
-    const nextMessages = [...messages, { role: "user", content: input }];
+    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: input }];
     setMessages(nextMessages);
 
     try {
