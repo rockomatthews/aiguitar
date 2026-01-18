@@ -174,22 +174,28 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as ChatRequest;
-  const message = body.message?.trim();
+  try {
+    const body = (await request.json()) as ChatRequest;
+    const message = body.message?.trim();
 
-  if (!message) {
-    return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    if (!message) {
+      return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    }
+
+    const baseSong = body.song ? validateSong(body.song) : createEmptySong();
+    let response: ChatResponse;
+
+    if (process.env.OPENAI_API_KEY) {
+      response = await callOpenAI(message, baseSong);
+    } else {
+      const fallback = applyMessageToSong(baseSong, message);
+      response = { ...fallback };
+    }
+
+    return NextResponse.json(response);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unexpected error generating response.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const baseSong = body.song ? validateSong(body.song) : createEmptySong();
-  let response: ChatResponse;
-
-  if (process.env.OPENAI_API_KEY) {
-    response = await callOpenAI(message, baseSong);
-  } else {
-    const fallback = applyMessageToSong(baseSong, message);
-    response = { ...fallback };
-  }
-
-  return NextResponse.json(response);
 }
