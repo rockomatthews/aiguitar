@@ -14,6 +14,7 @@ npm run dev
 ## Environment variables
 
 - `GP5_WRITER_URL`: URL for the GP5 writer service (e.g. `https://gp5-writer.example.com`).
+- `OPENAI_API_KEY`: OpenAI API key used by `/api/chat` to generate song updates.
 
 ## Vercel deployment
 

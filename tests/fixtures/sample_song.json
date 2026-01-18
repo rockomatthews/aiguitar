@@ -1,0 +1,49 @@
+{
+  "metadata": {
+    "title": "Sample Song",
+    "artist": "AI Builder",
+    "tempo": 120,
+    "keySignature": "C",
+    "timeSignature": {
+      "beats": 4,
+      "beatType": 4
+    },
+    "version": "5.00"
+  },
+  "sections": [],
+  "tracks": [
+    {
+      "id": "guitar",
+      "name": "Guitar",
+      "instrument": "Guitar",
+      "isDrums": false,
+      "stringCount": 6,
+      "tuning": [40, 45, 50, 55, 59, 64],
+      "capo": 0,
+      "volume": 100,
+      "pan": 64,
+      "measures": [
+        {
+          "index": 0,
+          "beats": [
+            {
+              "start": 0,
+              "notes": [
+                {
+                  "type": "note",
+                  "string": 6,
+                  "fret": 0,
+                  "duration": {
+                    "numerator": 1,
+                    "denominator": 4
+                  },
+                  "velocity": 90
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
