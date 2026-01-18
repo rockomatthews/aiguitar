@@ -77,6 +77,19 @@ The song object must include:
 - readyForExport: set true ONLY when the user explicitly asks to generate/export the GP5 file.
 
 Do not include markdown or extra text outside of JSON.
+Return a full song object. Example shape:
+{
+  "reply": "...",
+  "followUps": [],
+  "song": {
+    "metadata": { "title": "...", "artist": "...", "tempo": 96, "keySignature": "D minor", "timeSignature": {"beats":4,"beatType":4}, "version":"5.00" },
+    "sections": [],
+    "tracks": [],
+    "draftText": "...",
+    "chordsBySection": {},
+    "readyForExport": false
+  }
+}
 `.trim();
 
   const userPrompt = JSON.stringify({
@@ -87,6 +100,7 @@ Do not include markdown or extra text outside of JSON.
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.4,
+    response_format: { type: "json_object" },
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -106,6 +120,10 @@ Do not include markdown or extra text outside of JSON.
     parsed = JSON.parse(content);
   } catch (error) {
     throw new Error("OpenAI did not return valid JSON.");
+  }
+
+  if (!parsed.song) {
+    throw new Error("OpenAI response missing 'song' object.");
   }
 
   const validatedSong = SongSchema.parse(parsed.song);
