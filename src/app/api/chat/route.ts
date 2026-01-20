@@ -122,16 +122,37 @@ Return a full song object. Example shape:
     throw new Error("OpenAI did not return valid JSON.");
   }
 
+  const validatedSong = SongSchema.safeParse(parsed.song);
+  if (!validatedSong.success) {
+    const retry = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Fix the JSON to match the schema. Return JSON only.\nSchema errors:\n${JSON.stringify(validatedSong.error.issues)}\nOriginal response:\n${content}`
+        }
+      ]
+    });
+    const retryContent = retry.choices[0]?.message?.content?.trim();
+    if (!retryContent) {
+      throw new Error("OpenAI failed to repair the JSON response.");
+    }
+    parsed = JSON.parse(retryContent);
+  }
+
   if (!parsed.song) {
     throw new Error("OpenAI response missing 'song' object.");
   }
 
-  const validatedSong = SongSchema.parse(parsed.song);
+  const finalSong = SongSchema.parse(parsed.song);
   const reply = parsed.reply ?? "Updated the song.";
   const hydratedSong = {
-    ...validatedSong,
+    ...finalSong,
     draftText: parsed.song?.draftText ?? reply,
-    chordsBySection: parsed.song?.chordsBySection ?? validatedSong.chordsBySection
+    chordsBySection: parsed.song?.chordsBySection ?? finalSong.chordsBySection
   };
 
   return {
