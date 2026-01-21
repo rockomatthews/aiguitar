@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateSong } from "@/lib/songSchema";
+import { ensureMinimumSong } from "@/lib/songModel";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     );
   }
   const body = await request.json();
-  const song = validateSong(body);
+  const song = ensureMinimumSong(validateSong(body));
 
   const response = await fetch(`${GP5_WRITER_URL}/write`, {
     method: "POST",

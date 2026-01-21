@@ -88,6 +88,23 @@ export default function ChatComposer() {
     }
   }
 
+  const missingChecklist = [
+    {
+      label: "At least one track",
+      done: song.tracks.length > 0
+    },
+    {
+      label: "At least one measure",
+      done: song.tracks.some((track) => track.measures.length > 0)
+    },
+    {
+      label: "At least one beat",
+      done: song.tracks.some((track) =>
+        track.measures.some((measure) => (measure.beats?.length ?? 0) > 0)
+      )
+    }
+  ];
+
   return (
     <Stack spacing={3}>
       <Card>
@@ -152,6 +169,18 @@ export default function ChatComposer() {
           <Stack spacing={2}>
             <Typography variant="h6">Current Song</Typography>
             <Typography color="text.secondary">{summarizeSong(song)}</Typography>
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                GP5 Checklist
+              </Typography>
+              <ul>
+                {missingChecklist.map((item) => (
+                  <li key={item.label}>
+                    {item.done ? "✅" : "⬜️"} {item.label}
+                  </li>
+                ))}
+              </ul>
+            </Box>
             {song.draftText && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">

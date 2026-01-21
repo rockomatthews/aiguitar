@@ -66,3 +66,63 @@ export function summarizeSong(song: Song): string {
 
   return `Title: ${song.metadata.title}; Tempo: ${song.metadata.tempo} BPM; Tracks: ${trackList}; Measures: ${measureCount}`;
 }
+
+function createDefaultMeasure(index: number) {
+  return {
+    index,
+    beats: [
+      {
+        start: 0,
+        notes: [
+          {
+            type: "note",
+            string: 6,
+            fret: 0,
+            duration: { numerator: 1, denominator: 4 },
+            velocity: 90
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function createDefaultTrack() {
+  return {
+    id: "guitar",
+    name: "Guitar",
+    instrument: "Guitar",
+    isDrums: false,
+    stringCount: 6,
+    tuning: [40, 45, 50, 55, 59, 64],
+    capo: 0,
+    volume: 100,
+    pan: 64,
+    measures: [createDefaultMeasure(0)]
+  };
+}
+
+export function ensureMinimumSong(song: Song): Song {
+  if (song.tracks.length === 0) {
+    return {
+      ...song,
+      tracks: [createDefaultTrack()]
+    };
+  }
+
+  const tracks = song.tracks.map((track) => {
+    if (!track.measures || track.measures.length === 0) {
+      return { ...track, measures: [createDefaultMeasure(0)] };
+    }
+
+    const measures = track.measures.map((measure, index) => ({
+      ...measure,
+      index: typeof measure.index === "number" ? measure.index : index,
+      beats: measure.beats?.length ? measure.beats : [createDefaultMeasure(index).beats[0]]
+    }));
+
+    return { ...track, measures };
+  });
+
+  return { ...song, tracks };
+}
