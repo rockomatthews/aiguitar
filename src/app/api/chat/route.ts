@@ -162,6 +162,43 @@ Return a full song object. Example shape:
   };
 }
 
+function sanitizeSections(sections: Song["sections"]) {
+  return sections
+    .filter((section) => Number.isFinite(section.startMeasure) && Number.isFinite(section.length))
+    .map((section, index) => ({
+      ...section,
+      startMeasure: section.startMeasure ?? 0,
+      length: section.length ?? 1,
+      name: section.name || `Section ${index + 1}`
+    }));
+}
+
+function sanitizeMeasures(measures: Track["measures"]) {
+  return measures
+    .filter((measure) => typeof measure?.index === "number" && Array.isArray(measure?.beats))
+    .map((measure) => ({
+      ...measure,
+      beats: measure.beats ?? []
+    }));
+}
+
+function sanitizeTracks(tracks: Track[]) {
+  return tracks.map((track, index) => ({
+    ...track,
+    id: track.id || `track-${index + 1}`,
+    measures: sanitizeMeasures(track.measures ?? [])
+  }));
+}
+
+function normalizeSong(song: Song, fallback: Song): Song {
+  return {
+    ...fallback,
+    ...song,
+    sections: sanitizeSections(song.sections ?? []),
+    tracks: sanitizeTracks(song.tracks ?? fallback.tracks)
+  };
+}
+
 function applyMessageToSong(song: Song, message: string): { song: Song; reply: string; followUps: string[] } {
   let updated = song;
   const followUps: string[] = [];
@@ -225,13 +262,24 @@ export async function POST(request: Request) {
     let response: ChatResponse;
 
     if (process.env.OPENAI_API_KEY) {
-      response = await callOpenAI(message, baseSong);
+      try {
+        response = await callOpenAI(message, baseSong);
+      } catch (err) {
+        const fallback = applyMessageToSong(baseSong, message);
+        response = {
+          ...fallback,
+          reply:
+            "I hit an AI formatting error, so I used a simple fallback. Try again or refine your request.",
+          followUps: fallback.followUps
+        };
+      }
     } else {
       const fallback = applyMessageToSong(baseSong, message);
       response = { ...fallback };
     }
 
-    return NextResponse.json(response);
+    const normalized = normalizeSong(response.song, baseSong);
+    return NextResponse.json({ ...response, song: normalized });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected error generating response.";
