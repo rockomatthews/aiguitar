@@ -1,4 +1,4 @@
-import { Song, Track, validateSong } from "./songSchema";
+import { Measure, Song, Track, validateSong } from "./songSchema";
 
 export function createEmptySong(): Song {
   return validateSong({
@@ -67,7 +67,7 @@ export function summarizeSong(song: Song): string {
   return `Title: ${song.metadata.title}; Tempo: ${song.metadata.tempo} BPM; Tracks: ${trackList}; Measures: ${measureCount}`;
 }
 
-function createDefaultMeasure(index: number) {
+function createDefaultMeasure(index: number): Measure {
   return {
     index,
     beats: [
@@ -78,7 +78,7 @@ function createDefaultMeasure(index: number) {
             type: "note",
             string: 6,
             fret: 0,
-            duration: { numerator: 1, denominator: 4 },
+            duration: { numerator: 1, denominator: 4, dotted: false },
             velocity: 90
           }
         ]
@@ -87,7 +87,7 @@ function createDefaultMeasure(index: number) {
   };
 }
 
-function createDefaultTrack() {
+function createDefaultTrack(): Track {
   return {
     id: "guitar",
     name: "Guitar",
