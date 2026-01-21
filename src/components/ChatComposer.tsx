@@ -70,7 +70,8 @@ export default function ChatComposer() {
         body: JSON.stringify(song)
       });
       if (!response.ok) {
-        const detail = await response.json();
+        const text = await response.text();
+        const detail = text ? JSON.parse(text) : {};
         throw new Error(detail.error ?? "Failed to export GP5.");
       }
       const blob = await response.blob();
