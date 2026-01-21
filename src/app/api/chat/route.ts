@@ -54,6 +54,18 @@ function buildTrack(id: string, name: string, instrument: string, isDrums = fals
   };
 }
 
+function buildDraftResponse(baseSong: Song, draftText: string): ChatResponse {
+  return {
+    reply: draftText,
+    followUps: [],
+    song: SongSchema.parse({
+      ...baseSong,
+      draftText,
+      readyForExport: false
+    })
+  };
+}
+
 async function callOpenAI(message: string, song: Song): Promise<ChatResponse> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -97,10 +109,11 @@ Return a full song object. Example shape:
     currentSong: song
   });
 
-  const response = await client.chat.completions.create({
+  const responsePromise = client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.4,
     response_format: { type: "json_object" },
+    max_tokens: 1200,
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -109,6 +122,12 @@ Return a full song object. Example shape:
       }
     ]
   });
+  const response = await Promise.race([
+    responsePromise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("AI response timed out.")), 15000)
+    )
+  ]);
 
   const content = response.choices[0]?.message?.content?.trim();
   if (!content) {
@@ -119,7 +138,7 @@ Return a full song object. Example shape:
   try {
     parsed = JSON.parse(content);
   } catch (error) {
-    throw new Error("OpenAI did not return valid JSON.");
+    return buildDraftResponse(song, content);
   }
 
   const validatedSong = SongSchema.safeParse(parsed.song);
@@ -138,13 +157,17 @@ Return a full song object. Example shape:
     });
     const retryContent = retry.choices[0]?.message?.content?.trim();
     if (!retryContent) {
-      throw new Error("OpenAI failed to repair the JSON response.");
+      return buildDraftResponse(song, content);
     }
-    parsed = JSON.parse(retryContent);
+    try {
+      parsed = JSON.parse(retryContent);
+    } catch (error) {
+      return buildDraftResponse(song, content);
+    }
   }
 
   if (!parsed.song) {
-    throw new Error("OpenAI response missing 'song' object.");
+    return buildDraftResponse(song, parsed.reply ?? content);
   }
 
   const finalSong = SongSchema.parse(parsed.song);
