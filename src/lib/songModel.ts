@@ -67,7 +67,7 @@ export function summarizeSong(song: Song): string {
   return `Title: ${song.metadata.title}; Tempo: ${song.metadata.tempo} BPM; Tracks: ${trackList}; Measures: ${measureCount}`;
 }
 
-function createDefaultMeasure(index: number): Measure {
+export function createDefaultMeasure(index: number): Measure {
   return {
     index,
     beats: [
@@ -87,7 +87,7 @@ function createDefaultMeasure(index: number): Measure {
   };
 }
 
-function createDefaultTrack(): Track {
+export function createDefaultTrack(): Track {
   return {
     id: "guitar",
     name: "Guitar",

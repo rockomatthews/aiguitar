@@ -4,7 +4,9 @@ import {
   addTrack,
   createEmptySong,
   ensureMeasureCounts,
-  updateMetadata
+  updateMetadata,
+  createDefaultMeasure,
+  createDefaultTrack
 } from "@/lib/songModel";
 import { Song, SongSchema, Track, validateSong } from "@/lib/songSchema";
 
@@ -13,6 +15,7 @@ export const runtime = "nodejs";
 type ChatRequest = {
   message: string;
   song?: Song;
+  messages?: Array<{ role: "user" | "assistant"; content: string }>;
 };
 
 type ChatResponse = {
@@ -66,9 +69,14 @@ function buildDraftResponse(baseSong: Song, draftText: string): ChatResponse {
   };
 }
 
+function parseTitle(message: string): string | undefined {
+  const match = message.match(/called\s+'([^']+)'/i) || message.match(/called\s+\"([^\"]+)\"/i);
+  return match?.[1];
+}
+
 function buildLocalDraft(message: string, baseSong: Song): ChatResponse {
   const titleMatch = message.match(/called\s+'([^']+)'/i);
-  const title = titleMatch?.[1] ?? "Untitled";
+  const title = parseTitle(message) ?? titleMatch?.[1] ?? baseSong.metadata.title ?? "Untitled";
   const tempo = parseTempo(message) ?? baseSong.metadata.tempo ?? 96;
   const key = parseKey(message) ?? baseSong.metadata.keySignature ?? "D minor";
 
@@ -80,10 +88,10 @@ function buildLocalDraft(message: string, baseSong: Song): ChatResponse {
       tempo,
       keySignature: key
     },
-    tracks: baseSong.tracks.length ? baseSong.tracks : [buildTrack("guitar", "Guitar", "Guitar")]
+    tracks: baseSong.tracks.length ? baseSong.tracks : [createDefaultTrack()]
   };
 
-  const draftText = `TITLE: ${title}
+  const draftText = `${baseSong.draftText ? `${baseSong.draftText}\n\n` : ""}TITLE: ${title}
 Tempo: ${tempo} BPM
 Key: ${key}
 
@@ -183,6 +191,7 @@ Return a full song object. Example shape:
       model: "gpt-4o-mini",
       temperature: 0.2,
       response_format: { type: "json_object" },
+      max_tokens: 1200,
       messages: [
         { role: "system", content: systemPrompt },
         {
@@ -233,12 +242,11 @@ function sanitizeSections(sections: Song["sections"]) {
 }
 
 function sanitizeMeasures(measures: Track["measures"]) {
-  return measures
-    .filter((measure) => typeof measure?.index === "number" && Array.isArray(measure?.beats))
-    .map((measure) => ({
-      ...measure,
-      beats: measure.beats ?? []
-    }));
+  return measures.map((measure, index) => ({
+    ...measure,
+    index: typeof measure?.index === "number" ? measure.index : index,
+    beats: Array.isArray(measure?.beats) ? measure.beats : []
+  }));
 }
 
 function sanitizeTracks(tracks: Track[]) {
@@ -263,9 +271,14 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
   const followUps: string[] = [];
   const tempo = parseTempo(message);
   const key = parseKey(message);
+  const title = parseTitle(message);
 
   if (tempo) {
     updated = updateMetadata(updated, { tempo });
+  }
+
+  if (title) {
+    updated = updateMetadata(updated, { title });
   }
 
   if (key) {
@@ -285,6 +298,16 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
   }
 
   updated = ensureMeasureCounts(updated);
+
+  if (/create a measure|add a measure|new measure|create a bar|add a bar/i.test(message)) {
+    updated = {
+      ...updated,
+      tracks: updated.tracks.map((track) => ({
+        ...track,
+        measures: [...track.measures, createDefaultMeasure(track.measures.length)]
+      }))
+    };
+  }
 
   if (updated.tracks.length === 0) {
     followUps.push("What instruments should the song include (e.g. guitar, bass, drums)?");
