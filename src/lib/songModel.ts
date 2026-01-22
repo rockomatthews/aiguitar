@@ -132,7 +132,7 @@ function createChordBeat(rootString: number, fret: number) {
     start: 0,
     notes: [
       {
-        type: "note",
+        type: "note" as const,
         string: rootString,
         fret,
         duration: { numerator: 1, denominator: 4, dotted: false },
