@@ -69,6 +69,52 @@ function buildDraftResponse(baseSong: Song, draftText: string): ChatResponse {
   };
 }
 
+function buildChecklist(song: Song) {
+  const checklist = [
+    { id: "title", label: "Song title", done: Boolean(song.metadata.title) },
+    { id: "tempo", label: "Tempo (BPM)", done: Boolean(song.metadata.tempo) },
+    { id: "key", label: "Key signature", done: Boolean(song.metadata.keySignature) },
+    { id: "tracks", label: "Tracks (guitar/bass/drums)", done: song.tracks.length > 0 },
+    {
+      id: "measures",
+      label: "At least one measure",
+      done: song.tracks.some((track) => track.measures.length > 0)
+    },
+    {
+      id: "beats",
+      label: "At least one beat",
+      done: song.tracks.some((track) =>
+        track.measures.some((measure) => (measure.beats?.length ?? 0) > 0)
+      )
+    }
+  ];
+
+  return {
+    checklist,
+    missing: checklist.filter((item) => !item.done)
+  };
+}
+
+function nextChecklistPrompt(song: Song): string | null {
+  const { missing } = buildChecklist(song);
+  const next = missing[0];
+  if (!next) return null;
+  switch (next.id) {
+    case "tracks":
+      return "Which instruments should I include (guitar, bass, drums, synth)?";
+    case "tempo":
+      return "What tempo should we use? You can reply like '140 bpm'.";
+    case "key":
+      return "What key should the song be in?";
+    case "measures":
+      return "How many measures should I draft to start?";
+    case "beats":
+      return "Should I add a basic beat pattern to the first measure?";
+    default:
+      return "What should I add next?";
+  }
+}
+
 function parseTitle(message: string): string | undefined {
   const match = message.match(/called\s+'([^']+)'/i) || message.match(/called\s+\"([^\"]+)\"/i);
   return match?.[1];
@@ -272,6 +318,9 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
   const tempo = parseTempo(message);
   const key = parseKey(message);
   const title = parseTitle(message);
+  const wantsChords = /chord/i.test(message);
+  const wantsMeasure = /create a measure|add a measure|new measure|create a bar|add a bar/i.test(message);
+  const wantsMore = /add more|keep refining|keep going|expand|continue/i.test(message);
 
   if (tempo) {
     updated = updateMetadata(updated, { tempo });
@@ -299,7 +348,7 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
 
   updated = ensureMeasureCounts(updated);
 
-  if (/create a measure|add a measure|new measure|create a bar|add a bar/i.test(message)) {
+  if (wantsMeasure || wantsMore) {
     updated = {
       ...updated,
       tracks: updated.tracks.map((track) => ({
@@ -309,24 +358,41 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
     };
   }
 
-  if (updated.tracks.length === 0) {
-    followUps.push("What instruments should the song include (e.g. guitar, bass, drums)?");
+  if (wantsChords) {
+    updated = {
+      ...updated,
+      chordsBySection: {
+        ...(updated.chordsBySection ?? {}),
+        Chorus: ["D5", "F5", "G5", "Bb5"],
+        Verse: ["D5", "D5", "F5", "G5"]
+      }
+    };
   }
 
-  if (!tempo) {
-    followUps.push("What tempo should we use? You can reply like '120 bpm'.");
+  const checklist = buildChecklist(updated);
+  if (checklist.missing.find((item) => item.id === "tracks")) {
+    followUps.push("Which instruments should I include (guitar, bass, drums, synth)?");
   }
-
-  if (!key) {
-    followUps.push("What key do you want the song in?");
+  if (checklist.missing.find((item) => item.id === "tempo")) {
+    followUps.push("What tempo should we use? You can reply like '140 bpm'.");
+  }
+  if (checklist.missing.find((item) => item.id === "key")) {
+    followUps.push("What key should the song be in?");
+  }
+  if (checklist.missing.find((item) => item.id === "measures")) {
+    followUps.push("How many measures should I draft to start?");
+  }
+  if (!updated.chordsBySection) {
+    followUps.push("Should I generate chord progressions for the verse and chorus?");
   }
 
   const readyForExport =
     /generate\s*\.?gp5|export|generate file|create gp5/i.test(message) || song.readyForExport;
 
+  const guidedPrompt = nextChecklistPrompt(updated);
   const reply = readyForExport
     ? "I can generate the GP5 file now. Press 'Generate .GP5 File' when you're ready."
-    : "Got it. I updated the song settings and track list based on your request.";
+    : guidedPrompt ?? "Draft updated. Tell me to add chords, riffs, or more measures.";
 
   return { song: { ...updated, readyForExport }, reply, followUps };
 }
