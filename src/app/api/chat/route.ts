@@ -66,6 +66,42 @@ function buildDraftResponse(baseSong: Song, draftText: string): ChatResponse {
   };
 }
 
+function buildLocalDraft(message: string, baseSong: Song): ChatResponse {
+  const titleMatch = message.match(/called\s+'([^']+)'/i);
+  const title = titleMatch?.[1] ?? "Untitled";
+  const tempo = parseTempo(message) ?? baseSong.metadata.tempo ?? 96;
+  const key = parseKey(message) ?? baseSong.metadata.keySignature ?? "D minor";
+
+  const song = {
+    ...baseSong,
+    metadata: {
+      ...baseSong.metadata,
+      title,
+      tempo,
+      keySignature: key
+    },
+    tracks: baseSong.tracks.length ? baseSong.tracks : [buildTrack("guitar", "Guitar", "Guitar")]
+  };
+
+  const draftText = `TITLE: ${title}
+Tempo: ${tempo} BPM
+Key: ${key}
+
+[INTRO]
+Chugging guitars build tension, lead guitar teases a motif.
+
+[VERSE]
+Short, clipped lines about the theme you specified.
+
+[CHORUS]
+Repeat the core hook; keep it big and anthemic.
+
+[BRIDGE]
+Half-time breakdown before final chorus.`;
+
+  return buildDraftResponse(song, draftText);
+}
+
 async function callOpenAI(message: string, song: Song): Promise<ChatResponse> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -288,17 +324,10 @@ export async function POST(request: Request) {
       try {
         response = await callOpenAI(message, baseSong);
       } catch (err) {
-        const fallback = applyMessageToSong(baseSong, message);
-        response = {
-          ...fallback,
-          reply:
-            "I hit an AI formatting error, so I used a simple fallback. Try again or refine your request.",
-          followUps: fallback.followUps
-        };
+        response = buildLocalDraft(message, baseSong);
       }
     } else {
-      const fallback = applyMessageToSong(baseSong, message);
-      response = { ...fallback };
+      response = buildLocalDraft(message, baseSong);
     }
 
     const normalized = normalizeSong(response.song, baseSong);
