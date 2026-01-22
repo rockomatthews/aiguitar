@@ -126,3 +126,95 @@ export function ensureMinimumSong(song: Song): Song {
 
   return { ...song, tracks };
 }
+
+function createChordBeat(rootString: number, fret: number) {
+  return {
+    start: 0,
+    notes: [
+      {
+        type: "note",
+        string: rootString,
+        fret,
+        duration: { numerator: 1, denominator: 4, dotted: false },
+        velocity: 90
+      }
+    ]
+  };
+}
+
+function createMeasureWithFret(index: number, fret: number): Measure {
+  return {
+    index,
+    beats: [createChordBeat(6, fret)]
+  };
+}
+
+function buildProgressionMeasures(): Measure[] {
+  const frets = [0, 3, 5, 8];
+  return frets.map((fret, index) => createMeasureWithFret(index, fret));
+}
+
+function ensureTracksWithDefaults(song: Song): Song {
+  const tracks = song.tracks.length ? song.tracks : [createDefaultTrack()];
+  const hasBass = tracks.some((track) => track.instrument === "Bass");
+  const hasDrums = tracks.some((track) => track.isDrums);
+  const enriched = [...tracks];
+
+  if (!hasBass) {
+    enriched.push({
+      ...createDefaultTrack(),
+      id: "bass",
+      name: "Bass",
+      instrument: "Bass"
+    });
+  }
+
+  if (!hasDrums) {
+    enriched.push({
+      ...createDefaultTrack(),
+      id: "drums",
+      name: "Drums",
+      instrument: "Drum Kit",
+      isDrums: true,
+      stringCount: undefined,
+      tuning: undefined
+    });
+  }
+
+  return { ...song, tracks: enriched };
+}
+
+export function ensureMusicalSong(song: Song): Song {
+  let updated = ensureTracksWithDefaults(song);
+  updated = {
+    ...updated,
+    tracks: updated.tracks.map((track) => {
+      if (track.measures.length === 0) {
+        return {
+          ...track,
+          measures: buildProgressionMeasures()
+        };
+      }
+      return track;
+    })
+  };
+
+  if (!updated.chordsBySection) {
+    updated = {
+      ...updated,
+      chordsBySection: {
+        Intro: ["D5", "F5", "G5", "Bb5"]
+      }
+    };
+  }
+
+  if (!updated.draftText) {
+    updated = {
+      ...updated,
+      draftText:
+        "Auto-generated song draft. Intro progression: D5 - F5 - G5 - Bb5. Feel: steady 4/4."
+    };
+  }
+
+  return ensureMinimumSong(updated);
+}

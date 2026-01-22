@@ -202,16 +202,11 @@ export default function ChatComposer() {
               </Box>
             )}
             <Typography variant="caption" color="text.secondary">
-              {song.readyForExport
-                ? "Ready to export when you are."
-                : "Keep refining the song. Ask me to generate the GP5 when you're ready."}
+              You can generate a GP5 file at any time. A basic musical draft will be created if
+              needed.
             </Typography>
             <TabPreview song={song} />
-            <Button
-              variant="outlined"
-              onClick={handleExport}
-              disabled={isSubmitting || !song.readyForExport}
-            >
+            <Button variant="outlined" onClick={handleExport} disabled={isSubmitting}>
               Generate .GP5 File
             </Button>
           </Stack>
