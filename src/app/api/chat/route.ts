@@ -9,8 +9,10 @@ import {
   createDefaultTrack
 } from "@/lib/songModel";
 import { Song, SongSchema, Track, validateSong } from "@/lib/songSchema";
+import { midiToSong } from "@/lib/midiToSong";
 
 export const runtime = "nodejs";
+const MIDI_GEN_URL = process.env.MIDI_GEN_URL;
 
 type ChatRequest = {
   message: string;
@@ -69,6 +71,24 @@ function buildDraftResponse(baseSong: Song, draftText: string): ChatResponse {
   };
 }
 
+async function generateMidiSong(song: Song): Promise<Song | null> {
+  if (!MIDI_GEN_URL) return null;
+  const response = await fetch(`${MIDI_GEN_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tempo: song.metadata.tempo,
+      key: song.metadata.keySignature,
+      measures: song.tracks[0]?.measures.length || 8
+    })
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return midiToSong(song, buffer);
+}
 function buildChecklist(song: Song) {
   const checklist = [
     { id: "title", label: "Song title", done: Boolean(song.metadata.title) },
@@ -321,6 +341,9 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
   const wantsChords = /chord/i.test(message);
   const wantsMeasure = /create a measure|add a measure|new measure|create a bar|add a bar/i.test(message);
   const wantsMore = /add more|keep refining|keep going|expand|continue/i.test(message);
+  const wantsMusic = /make (it )?musical|generate song|make song|create music|generate riff|create tablature/i.test(
+    message
+  );
 
   if (tempo) {
     updated = updateMetadata(updated, { tempo });
@@ -392,7 +415,9 @@ function applyMessageToSong(song: Song, message: string): { song: Song; reply: s
   const guidedPrompt = nextChecklistPrompt(updated);
   const reply = readyForExport
     ? "I can generate the GP5 file now. Press 'Generate .GP5 File' when you're ready."
-    : guidedPrompt ?? "Draft updated. Tell me to add chords, riffs, or more measures.";
+    : wantsMusic
+      ? "Generating a musical draft. Tell me if you want chords, riffs, or more measures."
+      : guidedPrompt ?? "Draft updated. Tell me to add chords, riffs, or more measures.";
 
   return { song: { ...updated, readyForExport }, reply, followUps };
 }
@@ -408,6 +433,9 @@ export async function POST(request: Request) {
 
     const baseSong = body.song ? validateSong(body.song) : createEmptySong();
     let response: ChatResponse;
+    const wantsMusic = /make (it )?musical|generate song|make song|create music|generate riff|create tablature/i.test(
+      message
+    );
 
     if (process.env.OPENAI_API_KEY) {
       try {
@@ -419,7 +447,14 @@ export async function POST(request: Request) {
       response = buildLocalDraft(message, baseSong);
     }
 
-    const normalized = normalizeSong(response.song, baseSong);
+    let normalized = normalizeSong(response.song, baseSong);
+    const checklist = buildChecklist(normalized);
+    if ((checklist.missing.length === 0 || wantsMusic) && MIDI_GEN_URL) {
+      const generated = await generateMidiSong(normalized);
+      if (generated) {
+        normalized = normalizeSong(generated, normalized);
+      }
+    }
     return NextResponse.json({ ...response, song: normalized });
   } catch (error) {
     const message =
