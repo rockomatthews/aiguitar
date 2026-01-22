@@ -8,6 +8,7 @@ import {
   Card,
   CardContent,
   Divider,
+  MenuItem,
   Stack,
   TextField,
   Typography
@@ -25,6 +26,8 @@ export default function ChatComposer() {
   const [song, setSong] = useState<Song>(createEmptySong());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickGenre, setQuickGenre] = useState("metal");
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,6 +91,39 @@ export default function ChatComposer() {
     }
   }
 
+  async function handleQuickGenerate() {
+    if (!quickTitle.trim()) {
+      setError("Please enter a song title.");
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    const userMessage = `Generate full song: ${quickTitle} (${quickGenre})`;
+    try {
+      const response = await fetch("/api/generate/song", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: quickTitle, genre: quickGenre })
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        throw new Error(data.error ?? "Unable to generate the song.");
+      }
+      setSong(data.song);
+      setFollowUps(data.followUps ?? []);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: data.reply }
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unexpected error.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const missingChecklist = [
     {
       label: "At least one track",
@@ -107,6 +143,40 @@ export default function ChatComposer() {
 
   return (
     <Stack spacing={3}>
+      <Card>
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">Quick Generate</Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Song title"
+                value={quickTitle}
+                onChange={(event) => setQuickTitle(event.target.value)}
+                disabled={isSubmitting}
+              />
+              <TextField
+                select
+                label="Genre"
+                value={quickGenre}
+                onChange={(event) => setQuickGenre(event.target.value)}
+                disabled={isSubmitting}
+                sx={{ minWidth: 200 }}
+              >
+                {["metal", "rock", "punk", "pop", "blues", "djent", "grunge", "nu metal"].map((genre) => (
+                  <MenuItem key={genre} value={genre}>
+                    {genre}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button variant="contained" onClick={handleQuickGenerate} disabled={isSubmitting}>
+                Generate Full Song
+              </Button>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent>
           <Stack spacing={2}>

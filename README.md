@@ -16,6 +16,9 @@ npm run dev
 - `GP5_WRITER_URL`: URL for the GP5 writer service (e.g. `https://gp5-writer.example.com`).
 - `OPENAI_API_KEY`: OpenAI API key used by `/api/chat` to generate song updates.
 - `MIDI_GEN_URL`: URL for the MIDI generator service (e.g. `https://midi-gen.example.com`).
+- `SONGWRITER_API_KEY`: API key for the hosted songwriting API (defaults to `OPENAI_API_KEY`).
+- `SONGWRITER_BASE_URL`: Base URL for an OpenAI-compatible provider (optional).
+- `SONGWRITER_MODEL`: Model name for the songwriter (defaults to `gpt-4o-mini`).
 
 ## Vercel deployment
 
